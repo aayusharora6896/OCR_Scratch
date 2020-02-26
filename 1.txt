@@ -1,0 +1,41 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using AForge.Imaging.Filters;
+
+namespace WindowsFormsApp3
+{
+    public partial class Form1 : Form
+    {
+        Bitmap OriginalImage,graycolor;
+        public Form1()
+        {
+            InitializeComponent();
+        }
+
+        private void openToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            OpenFileDialog OpenImage = new OpenFileDialog();
+            var returnvalue = OpenImage.ShowDialog();
+            if (returnvalue == DialogResult.OK)
+            {
+                OriginalImage = new Bitmap(OpenImage.FileName);
+                pictureBox1.SizeMode= PictureBoxSizeMode.StretchImage;
+                pictureBox1.Image = OriginalImage;
+            }
+        }
+
+        private void grayScaleToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            pictureBox2.SizeMode = PictureBoxSizeMode.StretchImage;
+            GrayscaleBT709 GrayImage = new GrayscaleBT709();
+            Bitmap graycolor = GrayImage.Apply(OriginalImage);
+            pictureBox2.Image = graycolor;
+                
+        }

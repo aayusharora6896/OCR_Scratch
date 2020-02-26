@@ -1,0 +1,392 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+using AForge.Imaging.Filters;
+using SVM;
+using System.IO;
+
+namespace WindowsFormsApp7
+{
+    public partial class Form1 : Form
+    {
+        public Form1()
+        {
+            InitializeComponent();
+        }
+        public Bitmap OriginalImage1;
+        public int redt, count, greent, bluet, Total;
+        public int p=0;
+        int[,] zone = new int[60, 90];
+        char[] result = new char[26];
+        List<int> l;
+        List<int> l1;
+        Model model_svm;
+        string str;
+        int res;
+
+        //List<float[]> features;
+
+
+        private void openToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            OpenFileDialog OpenImage = new OpenFileDialog();
+            var returnvalue = OpenImage.ShowDialog();
+            if (returnvalue == DialogResult.OK)
+            {
+                OriginalImage1 = new Bitmap(OpenImage.FileName);
+                pictureBox1.SizeMode = PictureBoxSizeMode.StretchImage;
+                pictureBox1.Image = OriginalImage1;
+            }
+
+        }
+        private void zoningToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            
+            GrayscaleBT709 GrayImage = new GrayscaleBT709();
+            Bitmap graycolor = GrayImage.Apply(OriginalImage1);
+            Threshold BinaryImage = new Threshold();
+            Bitmap threshimage = BinaryImage.Apply(graycolor);
+            Invert Invert1 = new Invert();
+            Bitmap invert1image = Invert1.Apply(threshimage);
+            ExtractBiggestBlob Blobimage = new ExtractBiggestBlob();
+            Bitmap BigBlob = Blobimage.Apply(invert1image);
+            Invert Invert2 = new Invert();
+            Bitmap FinalSegment = Invert2.Apply(BigBlob);
+            ResizeBilinear ResizedImage = new ResizeBilinear(60, 90);
+            Bitmap resizeimage = ResizedImage.Apply(FinalSegment);
+            pictureBox2.Image = resizeimage;
+            for (int k = 0; k < 60; k += 10)
+            {
+                for (int l = 0; l < 90; l += 10)
+                {
+                    count = 0;
+                    for (int i = 0; i < 10; i++)
+                    {
+                        for (int j = 0; j < 10; j++)
+                        {
+                            Color pixelColor = resizeimage.GetPixel(i + k, j + l);
+                            redt = pixelColor.R;
+                            greent = pixelColor.G;
+                            bluet = pixelColor.B;
+                            if ((redt | greent | bluet) == 0)
+                            {
+                                count++;
+                                Total++;
+                            }
+                        }
+                    }
+                    zone[k, l] = count;
+                }
+            }
+            for (int k = 0; k < 60; k += 10)
+                for (int l = 0; l < 90; l += 10)
+                {
+                    Console.WriteLine("Zone[{0},{1}] = {2}", k, l, zone[k, l]);
+                }
+            Console.WriteLine(Total);
+        }
+
+        private float[] ExtractTestFeature(Bitmap image)
+        {
+            float[] x = new float[6000];
+            GrayscaleBT709 GrayImage = new GrayscaleBT709();
+            Bitmap graycolor = GrayImage.Apply(image);
+            Threshold BinaryImage = new Threshold();
+            Bitmap threshimage = BinaryImage.Apply(graycolor);
+            Invert Invert1 = new Invert();
+            Bitmap invert1image = Invert1.Apply(threshimage);
+            ExtractBiggestBlob Blobimage = new ExtractBiggestBlob();
+            Bitmap BigBlob = Blobimage.Apply(invert1image);
+            Invert Invert2 = new Invert();
+            Bitmap FinalSegment = Invert2.Apply(BigBlob);
+            ResizeBilinear ResizedImage = new ResizeBilinear(60, 90);
+            Bitmap resizeimage = ResizedImage.Apply(FinalSegment);
+            pictureBox2.Image = resizeimage;
+            List<float> tf = new List<float>();
+            for (int i = 0; i < 6; i++)
+            {
+                for (int j = 0; j < 9; j++)
+                {
+                    count = 0;
+                    for (int k = i * 10; k < i * 10 + 10; k++)
+                    {
+                        for (int l = j * 10; l < j * 10 + 10; l++)
+                        {
+                            Color pixelColor = resizeimage.GetPixel(k, l);
+                            redt = pixelColor.R;
+                            greent = pixelColor.G;
+                            bluet = pixelColor.B;
+                            if ((redt | greent | bluet) == 0)
+                            {
+                                count++;
+                                Total++;
+                            }
+                        }
+                    }
+                    tf.Add(count);
+                }
+            }
+
+            for (int i = 0; i < tf.Count; i++)
+            {
+                tf[i] /= Total;
+            }
+
+            ////for(int i = 0; i<60;i++)
+            //  for(int j=0;j<90;j++)
+            //{
+            //x[p] = zone[i,j];
+            // p++;
+            // }
+            //for (int p = 0; p < 54; p++)
+            //    x[p] = x[p] / Total;
+
+            return tf.ToArray();
+        }
+            private float[] ExtractFeature(Bitmap image)
+        {            
+            float[] x= new float[6000];
+            GrayscaleBT709 GrayImage = new GrayscaleBT709();
+           Bitmap graycolor = GrayImage.Apply(image);
+            Threshold BinaryImage = new Threshold();
+            Bitmap threshimage = BinaryImage.Apply(graycolor);
+            Invert Invert1 = new Invert();
+            Bitmap invert1image = Invert1.Apply(threshimage);
+            ExtractBiggestBlob Blobimage = new ExtractBiggestBlob();
+            Bitmap BigBlob = Blobimage.Apply(invert1image);
+            Invert Invert2 = new Invert();
+            Bitmap FinalSegment = Invert2.Apply(BigBlob);
+            ResizeBilinear ResizedImage = new ResizeBilinear(60, 90);
+            Bitmap resizeimage = ResizedImage.Apply(FinalSegment);
+            pictureBox2.Image = resizeimage;
+            //for (int k = 0; k < 60; k += 10)
+            //{
+            //    for (int l = 0; l < 90; l += 10)
+            //    {
+            //        count = 0;
+            //        for (int i = 0; i < 10; i++)
+            //        {
+            //            for (int j = 0; j < 10; j++)
+            //            {
+            //                Color pixelColor = resizeimage.GetPixel(i + k, j + l);
+            //                redt = pixelColor.R;
+            //                greent = pixelColor.G;
+            //                bluet = pixelColor.B;
+            //                if ((redt | greent | bluet) == 0)
+            //                {
+            //                    count++;
+            //                    Total++;
+            //                }
+
+            //            }
+            //        }
+            //    //    zone[k,l] = count;
+            //        x[p] = count;
+            //    }
+            //}
+            List<float> f = new List<float>();
+            for(int i = 0; i < 6; i++)
+            {
+                for(int j = 0; j < 9; j++)
+                {
+                    count = 0;
+                    for(int k = i * 10; k < i * 10 + 10; k++)
+                    {
+                        for(int l = j * 10; l < j * 10 + 10; l++)
+                        {
+                            Color pixelColor = resizeimage.GetPixel(k, l);
+                            redt = pixelColor.R;
+                            greent = pixelColor.G;
+                            bluet = pixelColor.B;
+                            if ((redt | greent | bluet) == 0)
+                            {
+                                count++;
+                                Total++;
+                            }
+                        }
+                    }
+                    f.Add(count);
+                }
+            }
+            
+            for(int i = 0; i < f.Count; i++)
+            {
+                f[i] /= Total;
+            }
+
+            ////for(int i = 0; i<60;i++)
+            //  for(int j=0;j<90;j++)
+            //{
+            //x[p] = zone[i,j];
+            // p++;
+            // }
+            //for (int p = 0; p < 54; p++)
+            //    x[p] = x[p] / Total;
+
+            return f.ToArray();
+        }
+        private List<Bitmap> loadImages(string folderPath, out List<int> labels)
+        {
+            labels = new List<int>();
+            string [] charFolder = Directory.GetDirectories(folderPath);
+            List<Bitmap> images = new List<Bitmap>();
+            for(int i = 0; i< charFolder.Length; ++i)
+            {
+                string[] imagePaths = Directory.GetFiles(charFolder[i], "*.*");
+                foreach (var path in imagePaths)
+                {
+                    Bitmap im = new Bitmap(path);
+                    images.Add(im);
+                }
+                var totalImageOf1Char = imagePaths.Length;
+                for (int j = 0; j < imagePaths.Length; ++j)
+                    labels.Add(i + 1);
+            }
+            return images;
+        }
+
+        private List<Bitmap> loadTestImage(string folderPath, out List<int> labels)
+        {
+            labels = new List<int>();
+            string[] charFolder = Directory.GetDirectories(folderPath);
+            List<Bitmap> images = new List<Bitmap>();
+            for (int i = 0; i < charFolder.Length; ++i)
+            {
+                string[] imagePaths = Directory.GetFiles(charFolder[i], "*.*");
+                foreach (var path in imagePaths)
+                {
+                    Bitmap im = new Bitmap(path);
+                    images.Add(im);
+                }
+                var totalImageOf1Char = imagePaths.Length;
+                for (int j = 0; j < imagePaths.Length; ++j)
+                    labels.Add(0);
+            }
+            return images;
+        }
+
+        private List<float[]> ExtractFeaturesForAllImages(List<Bitmap> images)
+        {
+          List<float[]> features = new List<float[]>();
+            foreach(var im in images)
+            {
+                float[] f = ExtractFeature(im);
+                features.Add(f);
+            }
+            return features;
+        }
+
+        private List<float[]> ExtractTestFeaturesForAllImages(List<Bitmap> images)
+        {
+            List<float[]> features = new List<float[]>();
+            foreach (var im in images)
+            {
+                float[] tf = ExtractFeature(im);
+                features.Add(tf);
+            }
+            return features;
+        }
+
+        private void WriteToFile(List<float[]> features, List<int> labels)
+        {
+            //List<float[]> features = new List<float[]>();
+
+            FileStream fs = new FileStream("dataset_ocr", FileMode.Create, FileAccess.Write);
+            StreamWriter sw = new StreamWriter(fs);
+            for (int j = 0;j < features.Count; ++j)
+            {
+                sw.Write(labels[j] + " ");
+                var f = features[j];
+                for (int i = 0; i < f.Length; i++)
+                {
+                    sw.Write(i + 1 + ":" + f[i] + " ");
+                }
+                sw.WriteLine();
+            }
+            sw.Flush();
+            sw.Close();
+            fs.Close();
+        }
+
+        private void WriteToTestFile(List<float[]> features, List<int> labels)
+        {
+            //List<float[]> features = new List<float[]>();
+
+            FileStream fs1 = new FileStream("testdataset_ocr", FileMode.Create, FileAccess.Write);
+            StreamWriter sw1 = new StreamWriter(fs1);
+            for (int j = 0; j < features.Count; ++j)
+            {
+                sw1.Write(labels[j] + " ");
+                var f = features[j];
+                for (int i = 0; i < f.Length; i++)
+                {
+                    sw1.Write(i + 1 + ":" + f[i] + " ");
+                }
+                sw1.WriteLine();
+            }
+            sw1.Flush();
+            sw1.Close();
+            fs1.Close();
+        }
+
+
+        private void trainDataToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Problem train = Problem.Read("dataset_ocr");
+            Parameter param = new Parameter();
+            param.C = 32;
+            param.Gamma = 8;
+            model_svm = Training.Train(train, param);
+        }
+
+        private void testDataToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Problem test = Problem.Read("testdataset_ocr");
+            Prediction.Predict(test, "textbox1", model_svm, false);
+
+            result[0] = 'a'; result[1] = 'b'; result[2] = 'c'; result[3] = 'd'; result[4] = 'e';
+            result[5] = 'f'; result[6] = 'g'; result[7] = 'h'; result[8] = 'i'; result[9] = 'j';
+            result[10] = 'k'; result[11] = 'l'; result[12] = 'm'; result[13] = 'n'; result[14] = 'o';
+            result[15] = 'p'; result[16] = 'q'; result[17] = 'r'; result[18] = 's'; result[19] = 't';
+            result[20] = 'u'; result[21] = 'v'; result[22] = 'w'; result[23] = 'x'; result[24] = 'y';
+            result[25] = 'z';
+            var filestream = new System.IO.FileStream("textbox1",System.IO.FileMode.Open,System.IO.FileAccess.Read);
+            var file = new System.IO.StreamReader(filestream, System.Text.Encoding.UTF8, true, 128);
+            str = file.ReadLine();
+            res = Int32.Parse(str);
+            label1.Text = (result[res]) ;
+        }
+
+        private void testFileToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            List<Bitmap> i;
+
+            List<float[]> tf;
+            i = loadTestImage(@"E:\testdata",out l1);
+            tf = ExtractTestFeaturesForAllImages(i);
+            WriteToTestFile(tf, l1);
+        }
+
+
+        
+        private void datasetToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            List<Bitmap> i;
+
+            List<float[]> f;
+            i = loadImages(@"E:\dataset", out l);
+            f = ExtractFeaturesForAllImages(i);
+            WriteToFile(f, l);
+        }
+
+
+    }
+
+}
+
